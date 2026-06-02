@@ -86,12 +86,17 @@
 
   gsap.registerPlugin(ScrollTrigger);
   paint(0);
+  // Phones/tablets/touch: shorter pin distance + snappier scrub so the film
+  // doesn't "hold" the scroll for 4+ screen-heights (the chaptered crossfade
+  // still plays, it just tracks the finger more closely and releases sooner).
+  const lite = window.matchMedia("(max-width: 1024px)").matches ||
+               window.matchMedia("(pointer: coarse)").matches;
   ScrollTrigger.create({
     trigger: ".film",
     start: "top top",
-    end: "+=" + (N * 110) + "%",
+    end: "+=" + (N * (lite ? 60 : 110)) + "%",
     pin: ".film-stage",
-    scrub: 0.6,
+    scrub: lite ? 0.35 : 0.6,
     onUpdate: (self) => paint(self.progress),
     onRefresh: (self) => paint(self.progress),
   });

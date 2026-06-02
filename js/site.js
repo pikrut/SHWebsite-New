@@ -6,12 +6,19 @@
   "use strict";
 
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const isMobile = window.matchMedia("(max-width: 1024px)").matches;
+  const isTouch = window.matchMedia("(pointer: coarse)").matches;
+  // Treat phones, tablets and any touch device as "mobile": collapse the
+  // heavier scroll-driven motion so touch scrolling stays native and smooth.
+  const isMobile = window.matchMedia("(max-width: 1024px)").matches || isTouch;
   const hasGSAP = typeof window.gsap !== "undefined";
 
-  /* ---------------- Lenis smooth scroll ---------------- */
+  /* ---------------- Lenis smooth scroll ----------------
+     Desktop / pointer devices only. On touch devices Lenis overrides the
+     native momentum + inertia the OS already provides, which is the #1 cause
+     of the "draggy" / high-friction scroll feel on phones — so there we let
+     the browser scroll natively. */
   let lenis = null;
-  if (typeof window.Lenis !== "undefined" && !reduce) {
+  if (typeof window.Lenis !== "undefined" && !reduce && !isTouch) {
     lenis = new Lenis({
       lerp: 0.09,
       smoothWheel: true,
@@ -155,25 +162,30 @@
 
     // (Hero entrance handled by CSS for reliability.)
 
-    // Parallax bg layers
-    const parallax = (sel, amt) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        gsap.to(el, {
-          yPercent: amt, ease: "none",
-          scrollTrigger: { trigger: el.closest("section") || el, start: "top bottom", end: "bottom top", scrub: true },
+    // Parallax bg layers + image inner-parallax — DESKTOP ONLY.
+    // These scrub transforms run on large hero/section images every scroll
+    // frame; on mobile that main-thread churn is what makes scrolling feel
+    // rough, for little visual payoff — so they're skipped (images sit static).
+    if (!isMobile) {
+      const parallax = (sel, amt) => {
+        document.querySelectorAll(sel).forEach((el) => {
+          gsap.to(el, {
+            yPercent: amt, ease: "none",
+            scrollTrigger: { trigger: el.closest("section") || el, start: "top bottom", end: "bottom top", scrub: true },
+          });
+        });
+      };
+      parallax(".stats-bg", -12);
+      parallax(".contact-bg", -10);
+
+      // Image inner parallax (zoomy)
+      document.querySelectorAll("[data-img-parallax]").forEach((el) => {
+        gsap.fromTo(el, { yPercent: -8 }, {
+          yPercent: 8, ease: "none",
+          scrollTrigger: { trigger: el.closest("section, .frame, .why-media, .philo-media") || el, start: "top bottom", end: "bottom top", scrub: true },
         });
       });
-    };
-    parallax(".stats-bg", -12);
-    parallax(".contact-bg", -10);
-
-    // Image inner parallax (zoomy)
-    document.querySelectorAll("[data-img-parallax]").forEach((el) => {
-      gsap.fromTo(el, { yPercent: -8 }, {
-        yPercent: 8, ease: "none",
-        scrollTrigger: { trigger: el.closest("section, .frame, .why-media, .philo-media") || el, start: "top bottom", end: "bottom top", scrub: true },
-      });
-    });
+    }
 
     // PROCESS pinned scrollytelling
     if (!isMobile) {

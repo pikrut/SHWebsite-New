@@ -13,8 +13,16 @@
   gsap.registerPlugin(ScrollTrigger);
   gsap.config({ force3D: true });
 
-  const mobile = window.matchMedia("(max-width: 760px)").matches;
-  const k = mobile ? 0.6 : 1;
+  // Phones, tablets and touch devices: skip the pinned hero zoom + every
+  // scrubbed parallax/drift below. Pinning the hero makes the page feel
+  // "stuck" while you try to scroll, and per-frame transforms on large images
+  // add friction — so on these devices the hero and sections just scroll
+  // naturally (the cheap IntersectionObserver reveals in site.js still play).
+  // Desktop keeps the full cinematic treatment.
+  if (window.matchMedia("(max-width: 1024px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches) return;
+
+  const k = 1;
 
   /* ---------- 1) PINNED HERO SCENE (the headline cinematic move) ---------- */
   function cineHero(heroSel, imgSel, innerSel, extraSel) {
