@@ -6,7 +6,13 @@
 
   const cfg = window.SH_BOOKINGS || {};
   const reps = window.SHBook.publishedStaff();
-  const apiBase = typeof cfg.ratingsApi === "string" ? cfg.ratingsApi.trim().replace(/\/+$/, "") : "";
+  // Only the configured HTTPS endpoint may receive review data.
+  let apiBase = "";
+  try {
+    const endpoint = new URL(cfg.ratingsApi);
+    if (endpoint.protocol === "https:" && !endpoint.username && !endpoint.password
+        && !endpoint.search && !endpoint.hash) apiBase = endpoint.href.replace(/\/+$/, "");
+  } catch { /* ratings remain unavailable for invalid configuration */ }
 
   const params = new URLSearchParams(window.location.search);
   const slug = (params.get("who") || window.location.hash.replace(/^#/, "") || "").trim().toLowerCase();
@@ -24,10 +30,10 @@
     name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 
   const photoHTML = (r, size) => {
-    if (r.photo && !/^https:\/\/images\.unsplash\.com/i.test(r.photo) && !/^REPLACE_/i.test(r.photo)) {
+    if (r.photo && /^images\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp)$/i.test(r.photo) && !/^https:\/\/images\.unsplash\.com/i.test(r.photo) && !/^REPLACE_/i.test(r.photo)) {
       const webp = r.photo.replace(/\.(jpe?g|png)$/i, ".webp");
-      const webpTag = /\.webp$/i.test(r.photo) ? "" : `<source type="image/webp" srcset="${webp}" />`;
-      return `<picture>${webpTag}<img src="${r.photo}" alt="${escapeHtml(r.name)}" width="${size}" height="${size}" decoding="async" /></picture>`;
+      const webpTag = /\.webp$/i.test(r.photo) ? "" : `<source type="image/webp" srcset="${escapeHtml(webp)}" />`;
+      return `<picture>${webpTag}<img src="${escapeHtml(r.photo)}" alt="${escapeHtml(r.name)}" width="${size}" height="${size}" decoding="async" /></picture>`;
     }
     return `<span class="rep-initials" aria-hidden="true">${escapeHtml(initials(r.name))}</span>`;
   };
@@ -102,7 +108,7 @@
       <section class="rate-card" id="rate" data-reveal>
         <div class="eyebrow">Your feedback</div>
         <h2 class="h-section">Rate ${escapeHtml(first)}</h2>
-        <p class="lede" id="rate-lede">After you meet, leave a rating. It helps other clients choose who to book.</p>
+        <p class="lede" id="rate-lede">After you meet, leave a rating. Your name and comment may be public. Do not include tax, financial, contact or other private information.</p>
         <div id="rate-form-wrap"></div>
         <div class="rate-reviews" id="rate-reviews" hidden>
           <h3>What clients said</h3>
@@ -152,6 +158,7 @@
       </form>`;
 
     let selected = 0;
+    let submitting = false;
     const stars = wrap.querySelector("#rate-stars");
     const hidden = wrap.querySelector("#rate-stars-value");
     stars.addEventListener("click", (e) => {
@@ -164,6 +171,7 @@
 
     wrap.querySelector("#rate-form").addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (submitting) return;
       const status = wrap.querySelector("#rate-status");
       const submit = wrap.querySelector("#rate-submit");
       const honeypot = wrap.querySelector("#rate-hp");
@@ -179,10 +187,19 @@
         status.textContent = "Please tell us your name.";
         return;
       }
+      if (name.length > 120 || comment.length > 600 || email.length > 256
+          || !wrap.querySelector("#rate-email").checkValidity()) {
+        status.textContent = "Check your email and keep your name within 120 characters and comment within 600 characters.";
+        return;
+      }
+      submitting = true;
       submit.disabled = true;
       try {
         const res = await fetch(`${apiBase}/${encodeURIComponent(person.slug)}/ratings`, {
           method: "POST",
+          credentials: "omit",
+          referrerPolicy: "no-referrer",
+          signal: AbortSignal.timeout(15000),
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
             stars: selected,
@@ -194,7 +211,7 @@
         });
         if (res.status === 204 || res.ok) {
           status.textContent = "Thank you. Your rating has been received.";
-          wrap.querySelector("#rate-form").hidden = true;
+          wrap.querySelector("#rate-form").replaceChildren(status);
           await loadRatings(person.slug);
           return;
         }
@@ -207,6 +224,7 @@
       } catch (err) {
         status.textContent = "We couldn’t reach the rating service. Please try again, or call (437) 925-6546.";
       } finally {
+        submitting = false;
         submit.disabled = false;
       }
     });
@@ -217,30 +235,39 @@
     const listWrap = document.getElementById("rate-reviews");
     const list = document.getElementById("rate-review-list");
     if (!box) return;
-    if (!summary || !summary.count) {
+    if (!summary || !Number.isSafeInteger(summary.count) || summary.count < 1) {
       box.hidden = true;
       box.textContent = "";
       if (listWrap) listWrap.hidden = true;
       return;
     }
     const avg = Number(summary.average);
-    const shown = Number.isFinite(avg) ? avg.toFixed(1) : "";
+    const shown = Number.isFinite(avg) && avg >= 1 && avg <= 5 ? avg.toFixed(1) : "";
     box.hidden = false;
     box.textContent = shown
       ? `${shown} out of 5 · ${summary.count} rating${summary.count === 1 ? "" : "s"}`
       : `${summary.count} rating${summary.count === 1 ? "" : "s"}`;
 
-    const reviews = Array.isArray(summary.reviews) ? summary.reviews : [];
-    if (listWrap && list && reviews.length) {
-      listWrap.hidden = false;
-      list.innerHTML = reviews.map((rev) => `
-        <blockquote class="rate-review">
-          <div class="rate-review-stars" aria-label="${escapeHtml(rev.stars)} out of 5">${"★".repeat(rev.stars)}${"☆".repeat(5 - rev.stars)}</div>
-          <p>${escapeHtml(rev.comment)}</p>
-          <footer>${escapeHtml(rev.reviewerName)}</footer>
-        </blockquote>`).join("");
-    } else if (listWrap) {
-      listWrap.hidden = true;
+    const reviews = Array.isArray(summary.reviews) ? summary.reviews.slice(0, 20) : [];
+    if (listWrap && list) {
+      list.replaceChildren();
+      for (const rev of reviews) {
+        if (!rev || !Number.isInteger(rev.stars) || rev.stars < 1 || rev.stars > 5
+            || typeof rev.comment !== "string" || typeof rev.reviewerName !== "string") continue;
+        const block = document.createElement("blockquote");
+        block.className = "rate-review";
+        const stars = document.createElement("div");
+        stars.className = "rate-review-stars";
+        stars.setAttribute("aria-label", `${rev.stars} out of 5`);
+        stars.textContent = "★".repeat(rev.stars) + "☆".repeat(5 - rev.stars);
+        const comment = document.createElement("p");
+        comment.textContent = rev.comment.slice(0, 600);
+        const author = document.createElement("footer");
+        author.textContent = rev.reviewerName.slice(0, 120);
+        block.append(stars, comment, author);
+        list.append(block);
+      }
+      listWrap.hidden = list.children.length === 0;
     }
   }
 
@@ -249,6 +276,9 @@
     try {
       const res = await fetch(`${apiBase}/${encodeURIComponent(personSlug)}/ratings`, {
         headers: { Accept: "application/json" },
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) return;
       renderSummary(await res.json());

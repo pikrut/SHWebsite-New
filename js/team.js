@@ -16,16 +16,19 @@
   if (tools) tools.hidden = false;
   if (staffSection) staffSection.hidden = false;
 
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g,
+    c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c]));
+
   const initials = (name) =>
     name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 
   const photoHTML = (r) => {
-    if (r.photo && !/^https:\/\/images\.unsplash\.com/i.test(r.photo) && !/^REPLACE_/i.test(r.photo)) {
+    if (r.photo && /^images\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp)$/i.test(r.photo) && !/^https:\/\/images\.unsplash\.com/i.test(r.photo) && !/^REPLACE_/i.test(r.photo)) {
       const webp = r.photo.replace(/\.(jpe?g|png)$/i, ".webp");
-      const webpTag = /\.webp$/i.test(r.photo) ? "" : `<source type="image/webp" srcset="${webp}" />`;
-      return `<picture>${webpTag}<img src="${r.photo}" alt="${r.name}" loading="lazy" decoding="async" width="400" height="400" /></picture>`;
+      const webpTag = /\.webp$/i.test(r.photo) ? "" : `<source type="image/webp" srcset="${escapeHtml(webp)}" />`;
+      return `<picture>${webpTag}<img src="${escapeHtml(r.photo)}" alt="${escapeHtml(r.name)}" loading="lazy" decoding="async" width="400" height="400" /></picture>`;
     }
-    return `<span class="rep-initials" aria-hidden="true">${initials(r.name)}</span>`;
+    return `<span class="rep-initials" aria-hidden="true">${escapeHtml(initials(r.name))}</span>`;
   };
 
   const allSpecs = [...new Set(reps.flatMap((r) => r.specializations || []))].sort();
@@ -50,16 +53,16 @@
   function cardHTML(r, i) {
     const years = (r.experience || "").replace(/\D.*$/, "");
     return `
-      <div class="rep-card" id="${r.slug}" data-reveal data-reveal-delay="${i % 3}" data-slug="${r.slug}">
+      <div class="rep-card" id="${escapeHtml(r.slug)}" data-reveal data-reveal-delay="${i % 3}" data-slug="${escapeHtml(r.slug)}">
         <div class="rep-photo">${photoHTML(r)}</div>
-        <h3>${r.name}</h3>
-        <div class="rep-title">${r.title || ""}</div>
-        <div class="rep-loc">${r.location || ""}</div>
-        <div class="rep-specs">${(r.specializations || []).slice(0, 3).map((s) => `<span>${s}</span>`).join("")}</div>
+        <h3>${escapeHtml(r.name)}</h3>
+        <div class="rep-title">${escapeHtml(r.title || "")}</div>
+        <div class="rep-loc">${escapeHtml(r.location || "")}</div>
+        <div class="rep-specs">${(r.specializations || []).slice(0, 3).map((s) => `<span>${escapeHtml(s)}</span>`).join("")}</div>
         ${years ? `<div class="rep-meta"><div class="rm"><div class="v">${years}+</div><div class="k">Years</div></div>
           <div class="rm"><div class="v">${(r.languages || []).length || "—"}</div><div class="k">Languages</div></div></div>` : ""}
         <div class="rep-actions">
-          <a class="btn btn-gold rep-book" href="#book" data-book="${r.slug}">Book Appointment <span class="btn-arrow">→</span></a>
+          <a class="btn btn-gold rep-book" href="#book" data-book="${escapeHtml(r.slug)}">Book Appointment <span class="btn-arrow">→</span></a>
           ${r.bio ? `<a class="rep-profile-link" href="profile.html?who=${encodeURIComponent(r.slug)}">View full profile</a>` : ""}
         </div>
       </div>`;
