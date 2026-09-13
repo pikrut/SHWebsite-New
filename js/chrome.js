@@ -7,6 +7,10 @@
 (function () {
   "use strict";
 
+  // Portal destination: change this value to https://app.shelevate.ca after production cutover.
+  // Use a trusted HTTPS URL; never derive this destination from query parameters.
+  const PORTAL_URL = "https://victorious-sky-0924e120f.7.azurestaticapps.net";
+
   const active = document.body.getAttribute("data-active") || "";
   const P = document.body.getAttribute("data-prefix") || ""; // "" at root
 
@@ -66,6 +70,7 @@
     <div class="nav-right">
       <a class="nav-phone" href="tel:+14379256546" aria-label="Call us at (437) 925-6546">${PHONE_SVG}<span>437·925·6546</span></a>
       <a class="btn btn-gold nav-cta" href="${P}team.html" data-magnetic>Book Appointment</a>
+      <a class="btn btn-gold nav-portal" href="${PORTAL_URL}" referrerpolicy="no-referrer">Client Portal</a>
       <button class="nav-burger" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>`;
   document.body.insertBefore(header, document.body.firstChild);
@@ -83,6 +88,7 @@
   mm.className = "mobile-menu";
   mm.innerHTML = `
     <a href="${P || "index.html"}">Home</a>
+    <a href="${PORTAL_URL}" referrerpolicy="no-referrer">Client Portal</a>
     <a href="${P}services.html">Services</a>
     <a href="${P}blog.html">Insights</a>
     <a href="${P}team.html">Team</a>
@@ -123,6 +129,7 @@
           <h4>Navigation</h4>
           <ul>
             <li><a href="${P || "index.html"}">Home</a></li>
+            <li><a href="${PORTAL_URL}" referrerpolicy="no-referrer">Client Portal</a></li>
             <li><a href="${P}services.html">Services</a></li>
             <li><a href="${P}team.html">Our Team</a></li>
             <li><a href="${P}blog.html">Insights</a></li>

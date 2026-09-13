@@ -1480,3 +1480,30 @@ a[href^="tel:"]:focus:not(:focus-visible) { outline: none; }
   .rm-info { grid-template-columns: 1fr; }
   .rm-specs { justify-content: center; }
 }
+
+/* Client portal: keep the entry point visible in compact and scrolled headers. */
+.nav-portal {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 12px 18px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.nav-portal:focus-visible {
+  outline: 3px solid #7ea9d8;
+  outline-offset: 4px;
+}
+.nav.scrolled .nav-links,
+.nav.scrolled .nav-phone,
+.nav.scrolled .nav-cta { display: none; }
+@media (max-width: 1440px) {
+  .nav-phone { display: none; }
+}
+@media (max-width: 1200px) {
+  .nav-links { display: none; }
+  .nav-burger { display: flex; }
+}
+@media (max-width: 480px) {
+  .nav-right { gap: 12px; }
+  .nav-portal { padding-inline: 12px; }
+}
